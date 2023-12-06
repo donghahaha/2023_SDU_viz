@@ -257,10 +257,11 @@ def update_value_slider(metric):
     Output("choropleth", "figure"),
     Input("Democracy metric", "value"),
     Input("regions", "value"),
-    Input("value_slider", "value")
+    Input("value_slider", "value"),
+    Input("choropleth", "clickData")
 )
 
-def update_choropleth(selected_metric, selected_region, arbitrary_limit):
+def update_choropleth(selected_metric, selected_region, arbitrary_limit, clicked):
     if selected_metric == "Turnout":
         selected_column = "v2eltrnout"
         legend_title = "Turnout"
@@ -342,7 +343,25 @@ def update_choropleth(selected_metric, selected_region, arbitrary_limit):
         margin=dict(l=0, r=0, t=0, b=0),
         height=600,
     )
-
+    
+    # Adds click functionality of highlighting a country.
+    # If a country is clicked, this layer is added to the model.
+    # This choropleth has only one location (selected) and a different color scale.
+    if clicked:
+        new_fig = go.Choropleth(
+            locations=[clicked["points"][0]["location"]], 
+            z=[1], # So that country is maximum purple. Or whichever other color.
+            locationmode="ISO-3",
+            colorscale=[[0, "purple"]],
+            showscale=False  # Hides the color scale.
+        )
+      
+        choro_fig.add_traces(scatter_icons.data)
+        choro_fig.add_traces(new_fig)
+        
+        return choro_fig
+    
+    
     # Combine choropleth and scatter plot
     
     choro_fig.add_traces(scatter_icons.data)
