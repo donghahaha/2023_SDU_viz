@@ -20,6 +20,7 @@ import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
+from sklearn.preprocessing import MinMaxScaler
 
 
 # Put some stuff here to mak layout less busy.
@@ -28,18 +29,30 @@ title_style = {"text_align": "left"}
 
 # You can replace this with a less.. heavy version of the csv.
 df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv")
+
+available_variables = ['v2x_polyarchy', 'v2x_suffr', 'v2xel_frefair', 'v2x_freexp_altinf', 'v2x_frassoc_thick', 'v2x_elecoff']
+variables_names = ['Democracy', 'Suffrage', 'free and fair', 'free', 'frassoq', 'election']
+
+metrics_dict=dict(zip(variables_names, available_variables))
+metrics_list_dicts = [{"label": x, "value": y} for x, y in zip(variables_names, available_variables)]
+
 df = df[["year",  # The desired columns from the csv.
          "country_text_id", 
          "country_name", 
          "v2eltrnout",
          "v2exbribe",
-         "v2x_polyarchy",
          "v2exnamhos",
-         "v2exnamhog"
+         "v2exnamhog",
+         'v2x_polyarchy', 
+         'v2x_suffr', 
+         'v2xel_frefair', 
+         'v2x_freexp_altinf', 
+         'v2x_frassoc_thick', 
+         'v2x_elecoff'
          ]]
 
 df = df[df["year"].isin(range(2000, 2023 + 1))] # Desired year range.
-# df = df.sort_values(by="year", ascending=False) # Sorting by latest year first.
+#df = df.sort_values(by="year", ascending=False) # Sorting by latest year first.
 
 #%% so we don"t load the csv file again by accident
 # Here begins the dash app
@@ -63,9 +76,10 @@ app.layout = dbc.Container([
             # Metric Selector
             dcc.Dropdown(
                 id="Democracy metric", 
-                options=["Democracy Score", "Corruption Score", "Turnout"],
-                value="Democracy Score",
-                clearable=False
+                options=list(metrics_dict.keys()),
+                value="Democracy",
+                clearable=False,
+                multi=False,
             ),
             html.Br(),
             html.Br(),
@@ -101,8 +115,26 @@ app.layout = dbc.Container([
     
     # Click country graph & other 
     dbc.Row([
-        dbc.Col(html.Div(dcc.Graph(id="select_country_graph"))),
-        dbc.Col(html.Div(id="test_thingy"))
+        
+        dbc.Col([
+            dcc.Graph(id="select_country_graph"),
+            dcc.RadioItems(
+                id="select_variables",
+                options=list(metrics_dict.keys()),
+                value="Democracy",
+                #inline = True,
+            ),
+        ]),
+        dbc.Col([
+            html.Div(id="test_thingy"),
+            dcc.Dropdown(
+                id="select_year",
+                options=[{"label": x, "value": x} for x in df["year"].unique()],
+                value=2022,
+                clearable=False,
+            ),
+            dcc.Graph(id="min_max_graph")
+        ])
     ]),
     
     
@@ -114,7 +146,7 @@ app.layout = dbc.Container([
         dcc.Dropdown(
         id="multi_compare", 
         options=[{"label": country, "value": country} for country in df["country_name"].drop_duplicates()], # Removes duplicate country entries
-        value=["Denmark", "South Korea"], multi=True), # Multi allows for multiple selections.
+        value=["Denmark", "South Korea", "Hungary"], multi=True), # Multi allows for multiple selections.
         ]),
     
     # Compare Graph
@@ -122,8 +154,11 @@ app.layout = dbc.Container([
         dbc.Col(
             dcc.Graph(id="compare_graph"), width=10
         ),
+        dcc.Graph(id="area_chart")
         
     ]),
+    
+
     
 ])
 
@@ -132,20 +167,14 @@ app.layout = dbc.Container([
 @app.callback(
     Output("select_country_graph", "figure"),
     Output("test_thingy", "children"),
-    Input("Democracy metric", "value"),
-    Input("choropleth", "clickData"),
+    Input("select_variables", "value"),
+    Input("choropleth", "clickData")
     )
 
 def update_select_country(selected_metric, selected_country):
-    if selected_metric == "Turnout":
-        selected_column = "v2eltrnout"
-        legend_title = "Turnout"
-    elif selected_metric == "Corruption Score":
-        selected_column = "v2exbribe"
-        legend_title = "Lack of Corruption"
-    elif selected_metric == "Democracy Score":
-        selected_column = "v2x_polyarchy"
-        legend_title = "Democracy Score"
+    
+    selected_column = metrics_dict[selected_metric]
+    legend_title = selected_metric
     
 
     if selected_country is not None:
@@ -154,7 +183,7 @@ def update_select_country(selected_metric, selected_country):
         fig_selected_country = px.line(
             df[df["country_text_id"] == country_iso].groupby("year")[selected_column].mean().reset_index(),
             x="year",  
-            y=selected_column,    
+            y=[selected_column],    
             title=f"{legend_title}: {country_name}",
             markers=True,
         )
@@ -205,15 +234,9 @@ def update_select_country(selected_metric, selected_country):
 
 def update_comparison(selected_metric, compare):
     
-    if selected_metric == "Democracy Score":
-        selected_column = "v2x_polyarchy"
-        legend_title = "Democracy Score"
-    elif selected_metric == "Corruption Score":
-        selected_column = "v2exbribe"
-        legend_title = "Lack of Corruption"
-    else:
-        selected_column = "v2eltrnout"
-        legend_title = "Turnout"
+    selected_column = metrics_dict[selected_metric]
+    legend_title = selected_metric
+
     
     # Comparison tool
     compare_df = df[df["country_name"].isin(compare)]  
@@ -262,15 +285,9 @@ def update_value_slider(metric):
 )
 
 def update_choropleth(selected_metric, selected_region, arbitrary_limit, clicked):
-    if selected_metric == "Turnout":
-        selected_column = "v2eltrnout"
-        legend_title = "Turnout"
-    elif selected_metric == "Corruption Score":
-        selected_column = "v2exbribe"
-        legend_title = "Lack of Corruption"
-    elif selected_metric == "Democracy Score":
-        selected_column = "v2x_polyarchy"
-        legend_title = "Democracy Score"
+
+    selected_column = metrics_dict[selected_metric]
+    legend_title = selected_metric
 
     # Main choropleth graph
     choro_fig = px.choropleth(
@@ -292,13 +309,13 @@ def update_choropleth(selected_metric, selected_region, arbitrary_limit, clicked
     )
 
     choro_fig.update_geos(
+        #projection_type="natural earth",
         coastlinecolor="Black",
         landcolor="white",
         countrycolor="white",
         oceancolor="LightBlue",
         showcoastlines=True,
-        showland=True,
-        showcountries=True,
+        showland=False,
         showocean=True,
         showlakes=False,
         showframe=True,
@@ -390,5 +407,67 @@ def do_something(hovering):
 
         return iso
 
+
+
+
+
+@app.callback(
+    Output('min_max_graph', 'figure'),
+    Input("select_year", "value"),
+)
+def update_min_max_graph(year):
+    selected_df = df.loc[df["year"] == year].sort_values(by='v2x_polyarchy', ascending=True)
+    min_max_df = pd.concat([selected_df.head(5), selected_df.tail(5)], ignore_index=True, axis=0)
     
+    fig_combined = px.bar(
+        min_max_df,
+        x='v2x_polyarchy',
+        y='country_name',
+        title=f"Most and least democratic states in {year}",
+        color='v2x_polyarchy',
+        color_continuous_scale='Blues'
+    )
+    
+    fig_combined.update_layout(
+        xaxis_title="Democracy score",
+        yaxis_title="State",
+        coloraxis_showscale=False,
+        template='plotly_white'
+    )
+    
+    fig_combined.update_traces(
+        hovertemplate="Democracy score: %{x}"
+    )
+
+    return fig_combined
+
+@app.callback(
+    Output('area_chart', 'figure'),
+    Input("Democracy metric", "value"),
+    Input("choropleth", "clickData")
+)
+
+def update_area_chart(selected_metric, clicked):
+    
+    if not clicked:
+        return no_update
+
+    grouped_df = df[df["country_text_id"] == clicked["points"][0]["location"]]
+    grouped_df = grouped_df[grouped_df["year"].between(2000, 2022)].groupby("year").mean().reset_index()
+    
+    
+    plot = go.Figure()
+    n_metrics = 0
+    for name, value in metrics_dict.items():
+        n_metrics += 1
+        df[value] = MinMaxScaler().fit_transform(df[[value]])
+        plot.add_trace(go.Scatter( 
+            name = f'Data on: {name}', 
+            x = grouped_df["year"],
+            y = grouped_df[value], 
+            stackgroup='one'
+       ))
+    plot.update_yaxes(range=(0, n_metrics+1))
+  
+    return plot
 app.run_server(debug=False) # Can also set to true, but doesn"t work for me for some reason.
