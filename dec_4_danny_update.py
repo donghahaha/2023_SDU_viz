@@ -1,23 +1,18 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Dec  6 14:54:10 2023
-
-@author: caspe
-"""
-
 import pandas as pd
 import plotly.express as px
-from dash import Dash, dcc, html, Input, Output, no_update, State
+from dash import Dash, dcc, html, Input, Output, no_update, State, ctx
+import dash_daq as daq
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from sklearn.preprocessing import MinMaxScaler
 
 
 # Put some stuff here to mak layout less busy.
-title_style = {"text_align": "left"}
 row_1_style = {"height":"70vh"}
-row_2_style = {"height":"10vh"}
-row_3_style = {"height":"1vh"}
+container_style = {"position":"relative"}
+absolute_object_style = {"position":"absolute", "z-index":"10000", "bottom":"25%", "left":"5%"}
+absolute_object_style_2 = {"position":"absolute", "z-index":"10000", "bottom":"35%", "left":"5%"}
 
 # You can replace this with a less.. heavy version of the csv.
 df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv")
@@ -26,9 +21,7 @@ available_variables = ['v2x_polyarchy', 'v2x_suffr', 'v2xel_frefair', 'v2x_freex
 variables_names = ['Democracy', 'Suffrage', 'free and fair', 'free', 'frassoq', 'election']
 
 metrics_dict=dict(zip(variables_names, available_variables))
-metrics_inverse = {v: k for k, v in metrics_dict.items()} 
-# Inverses the values. Easier than having to make a loop every time we want to find a title for a graph.
-
+metrics_inverse = {v: k for k, v in metrics_dict.items()} # Can remove if not used.
 
 metrics_list_dicts = [{"label": x, "value": y} for x, y in zip(variables_names, available_variables)]
 
@@ -47,8 +40,8 @@ df = df[["year",  # The desired columns from the csv.
          'v2x_elecoff'
          ]]
 
-df = df[df["year"].isin(range(1946, 2023 + 1))] # Desired year range.
-#df = df.sort_values(by="year", ascending=False) # Sorting by latest year first.
+df = df[df["year"].isin(range(1980, 2023 + 1))] # Desired year range.
+df = df.sort_values(by="year", ascending=True)
 
 
 
@@ -75,13 +68,6 @@ for metric in available_variables:
 
 
 
-container_style = {"position":"relative"}
-absolute_object_style = {"position":"absolute", "z-index":"10000", "bottom":"25%", "left":"5%"}
-absolute_object_style_2 = {"position":"absolute", "z-index":"10000", "bottom":"35%", "left":"5%"}
-
-
-
-
 #%% so we don"t load the csv file again by accident
 # Here begins the dash app
 app = Dash(__name__, external_stylesheets = [dbc.themes.BOOTSTRAP])
@@ -97,6 +83,8 @@ app.layout = dbc.Container([
                 
             # Region Selector
             html.Div([
+                html.P("Toggle Colorblind Mode"),
+                daq.BooleanSwitch(id='color_switch', on=False),
                 html.P("Select a Metric", style={"margin-bottom":0}),
                 # Metric Selector
                 dcc.Dropdown(
@@ -267,13 +255,28 @@ def update_comparison(selected_metric, compare):
     Input("Democracy metric", "value"),
     Input("regions", "value"),
     Input("choropleth", "clickData"),
-    State("choropleth", "figure"),
+    Input("color_switch", "on"),
+    State("choropleth", "figure")
 )
 
-def update_choropleth(selected_metric, selected_region, clicked, figure):
+
+def update_choropleth(selected_metric, selected_region, clicked, switch, old_fig):
+    
+    if ctx.triggered_id == 'choropleth':
+        old_fig["data"][2]["locations"] = [clicked["points"][0]["location"]]
+        return old_fig
+    
+    if ctx.triggered_id == 'regions':
+        old_fig["layout"]["geo"]["scope"] = selected_region.lower()
+        
+        if selected_region != "World":
+            old_fig["layout"]["geo"]["lataxis"] = None
+        else:
+            old_fig["layout"]["geo"]["lataxis"] = {'range': [-59, 100]}
+        return old_fig
+
     selected_column = metrics_dict[selected_metric]
     legend_title = selected_metric
-
     
     # Main choropleth graph
     choro_fig = px.choropleth(
@@ -283,8 +286,7 @@ def update_choropleth(selected_metric, selected_region, clicked, figure):
         locationmode="ISO-3",
         color=selected_column,
         hover_name="country_name",
-        color_continuous_scale='YlGnBu', # Just toying with some different types.
-        # https://plotly.com/python/builtin-colorscales/#builtin-sequential-color-scales
+        color_continuous_scale="gray_r" if switch else "Blues", # Just toying with some different types.
         scope=selected_region.lower(),
         animation_frame="year",
 
@@ -307,8 +309,7 @@ def update_choropleth(selected_metric, selected_region, clicked, figure):
             resolution=110,
             projection_type="equirectangular",
             coastlinecolor="Black",
-            landcolor="black",
-            #countrycolor="black",
+            landcolor="yellow" if switch else "black",
             oceancolor="white",
             showcoastlines=True,
             showland=True,
@@ -341,7 +342,7 @@ def update_choropleth(selected_metric, selected_region, clicked, figure):
                 color=df_for_dots["trend_v2x_polyarchy"],
                 colorscale=[[0, 'red'], [0.5, 'blue'], [1, 'green']],
                 size=5,
-                symbol=df_for_dots["trend_v2x_polyarchy"].apply(lambda x: "circle" if x > 0 else "square"),
+                symbol=df_for_dots["trend_v2x_polyarchy"].apply(lambda x: "triangle-up-open" if x > 0 else "triangle-down-open"),
                 opacity=1,
             ),
             
@@ -352,7 +353,6 @@ def update_choropleth(selected_metric, selected_region, clicked, figure):
     
 
     scatter_icons.update_geos(
-        projection_type="natural earth", 
         visible=False
     )
 
@@ -364,45 +364,43 @@ def update_choropleth(selected_metric, selected_region, clicked, figure):
     # Adds click functionality of highlighting a country.
     # If a country is clicked, this layer is added to the model.
     # This choropleth has only one location (selected) and a different color scale.
-    if clicked:
-        new_fig = go.Choropleth(
-            locations=[clicked["points"][0]["location"]], 
-            z=[1], # So that country is maximum purple. Or whichever other color.
-            locationmode="ISO-3",
-            colorscale=[[0, "purple"]],
-            showscale=False,  # Hides the color scale.
-            hoverinfo='skip',
-        )
-      
-        choro_fig.add_traces(scatter_icons.data)
-        
-        choro_fig.add_traces(new_fig)
-
-        return choro_fig
     
-    
-    # Combine choropleth and scatter plot
-    
+    new_fig = go.Choropleth(
+        locations=[clicked["points"][0]["location"]] if clicked else ["USA"], 
+        z=[1], # So that country is maximum purple. Or whichever other color.
+        locationmode="ISO-3",
+        colorscale=[[0, "purple"]],
+        showscale=False,  # Hides the color scale.
+        hoverinfo='skip',
+    )
+  
     choro_fig.add_traces(scatter_icons.data)
     
+    choro_fig.add_traces(new_fig)
+
     return choro_fig
+    
 
 
 
 @app.callback(
     Output('min_max_graph', 'figure'),
     Input("select_year", "value"),
+    Input("Democracy metric", "value"),
+    State("min_max_graph", "figure")
 )
-def update_min_max_graph(year):
-    selected_df = df.loc[df["year"] == year].sort_values(by='v2x_polyarchy', ascending=True)
+def update_min_max_graph(year, selected_metric, old_fig):
+    column = metrics_dict[selected_metric]
+    shortened_df = df[["year", "country_name", column]]
+    selected_df = shortened_df.loc[df["year"] == year].sort_values(by=column, ascending=True)
     min_max_df = pd.concat([selected_df.head(5), selected_df.tail(5)], ignore_index=True, axis=0)
     
     fig_combined = px.bar(
         min_max_df,
-        x='v2x_polyarchy',
+        x=column,
         y='country_name',
         title=f"Most and least democratic states in {year}",
-        color='v2x_polyarchy',
+        color=column,
         color_continuous_scale='Blues'
     )
     
@@ -434,7 +432,8 @@ def update_area_chart(selected_metric, clicked):
         clicked = clicked["points"][0]["location"]
 
     grouped_df = df[df["country_text_id"] == clicked]
-    grouped_df = grouped_df[grouped_df["year"].between(2000, 2022)].groupby("year").mean().reset_index()
+    
+    grouped_df = grouped_df[grouped_df["year"].between(1980, 2022)].groupby("year").mean().reset_index()
     
     
     plot = go.Figure()
@@ -458,3 +457,4 @@ def update_area_chart(selected_metric, clicked):
 
 
 app.run_server(debug=True, use_reloader=False) # Can also set to true, but doesn"t work for me for some reason.
+
