@@ -15,7 +15,7 @@ absolute_object_style = {"position":"absolute", "z-index":"10000", "bottom":"25%
 absolute_object_style_2 = {"position":"absolute", "z-index":"10000", "bottom":"35%", "left":"5%"}
 
 # You can replace this with a less.. heavy version of the csv.
-df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv")
+df = pd.read_csv("V-Dem-CY-FullOthers_csv_v13/V-Dem-CY-Full+Others-v13.csv")
 
 available_variables = ['v2x_polyarchy', 'v2x_suffr', 'v2xel_frefair', 'v2x_freexp_altinf', 'v2x_frassoc_thick', 'v2x_elecoff']
 variables_names = ['Democracy', 'Suffrage', 'free and fair', 'free', 'frassoq', 'election']
@@ -169,26 +169,57 @@ def update_select_country(selected_metric, selected_country):
 
     if selected_country is not None:
         country_iso = selected_country["points"][0]["location"]
+        country_name = selected_country["points"][0]["hovertext"]
+
+        wikipedia_link = [f"<a href='http://en.wikipedia.org/wiki/{year}_in_{country_name}'>ㆍ</a>" for year in range(1980,2023)]
+
+        df_ = df[df["country_text_id"] == country_iso].groupby("year")[selected_column].mean().reset_index()
+
         fig_selected_country = px.line(
-            df[df["country_text_id"] == country_iso].groupby("year")[selected_column].mean().reset_index(),
+            df_,
             x="year",  
-            y=[selected_column],    
-            #title=f"{legend_title}: {country_name}",
-            markers=True,
+            y=[selected_column],
+            markers=True
         )
 
-    
-        
+        for year in range(1980,2023):
+            fig_selected_country.add_annotation(
+                                    x=year,  
+                                    y=df_.iloc[year-1980][f"{selected_column}"],
+                                    showarrow=False,
+                                    text=wikipedia_link[year-1980],
+                                    xanchor='auto',
+                                    yanchor='auto')
         
     else:
         country_iso = "TUR"
+        wikipedia_link = [f"<a href='http://en.wikipedia.org/wiki/{year}_in_Turkey'>ㆍ</a>" for year in range(1980,2023)]
+
+        df_ = df[df["country_text_id"] == country_iso].groupby("year")[selected_column].mean().reset_index()
+
         fig_selected_country = px.line(
-            df[df["country_text_id"] == country_iso].groupby("year")[selected_column].mean().reset_index(),
+            df_,
             x="year",  
-            y=selected_column, 
-            #title=f"{legend_title}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}",
-            markers=True,
+            y=[selected_column],
+            markers=True
         )
+
+        for year in range(1980,2023):
+            fig_selected_country.add_annotation(
+                                    x=year,  
+                                    y=df_.iloc[year-1980][f"{selected_column}"],
+                                    showarrow=False,
+                                    text=wikipedia_link[year-1980],
+                                    xanchor='auto',
+                                    yanchor='auto')
+
+        # fig_selected_country = px.line(
+        #     df[df["country_text_id"] == country_iso].groupby("year")[selected_column].mean().reset_index(),
+        #     x="year",  
+        #     y=selected_column, 
+        #     #title=f"{legend_title}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}",
+        #     markers=True,
+        # )
         
     fig_selected_country.update_traces(hovertemplate=None)
     #fig_selected_country.update_xaxes(rangeslider_visible=True)
@@ -458,3 +489,5 @@ def update_area_chart(selected_metric, clicked):
 
 app.run_server(debug=True, use_reloader=False) # Can also set to true, but doesn"t work for me for some reason.
 
+
+# %%
