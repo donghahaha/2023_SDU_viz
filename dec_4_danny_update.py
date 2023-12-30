@@ -1,4 +1,4 @@
-#%% Downloading CSV
+#%% Preparing Data
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, State, ctx
@@ -9,24 +9,37 @@ from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 
 
-
-# =============================================================================
-# CSV AND METRICS
-# =============================================================================
-df_raw = pd.read_csv("V-Dem-CY-Full+Others-v13.csv")
-
-#%% Preparing Data
-
 # =============================================================================
 # STYLE SECTION.
 # =============================================================================
 row_1_style = {"height":"70vh"}
 container_style = {"position":"relative"}
-absolute_object_style = {"position":"absolute", "z-index":"10000", "bottom":"25%", "left":"5%"}
-absolute_object_style_2 = {"position":"absolute", "z-index":"10000", "bottom":"35%", "left":"5%"}
+absolute_object_style = {"position":"absolute", "zIndex":"10000", "bottom":"25%", "left":"5%"}
+absolute_object_style_2 = {"position":"absolute", "zIndex":"10000", "bottom":"35%", "left":"5%"}
+abs_obj_style_3 = {
+        "position":"absolute", 
+        "zIndex":"10000", 
+        "top":"0%", 
+        "left":"5%", 
+        # "background": "linear-gradient(to left, blue, red)",
+        # "-webkit-background-clip": "text",
+        # "color": "transparent"
+}
+
+abs_obj_explanations = {
+        "position":"absolute", 
+        "zIndex":"10000", 
+        "top":"50%", 
+        "left":"18%",
+        #"background":"black",
+        #"color":"white",
+        "padding":"5px",
+        "width":"10%",
+        "fontSize":"15px"
+}
 
 # =============================================================================
-# CSV COLUMN SELECTION & MORE
+# CSV COLUMN SELECTION, METRICS & MORE
 # =============================================================================
 
 available_variables = ['v2x_polyarchy',
@@ -34,7 +47,7 @@ available_variables = ['v2x_polyarchy',
                        'v2smonper',
                        'v2x_gender',
                        'v2smgovdom',
-                       'v2x_regime_amb',
+                       #'v2x_regime_amb',
                        'v2xeg_eqaccess',
                        'v2x_suffr',
                        'v2x_freexp_altinf',
@@ -48,17 +61,17 @@ available_variables = ['v2x_polyarchy',
 # 'v2mecenefi' # internet censorship
 # 'v2smgovfilprc' # Internet filtering in practice
 
-variables_names = ['Democracy',
+variables_names = ['Electoral Democracy',
                    'Freedom from Violence',
                    'Online Media Pluralism',
-                   'Women\'s Pol Rights',
-                   'Gov. Dist. False Info',
-                   'Type of Regime',
+                   'Women\'s Pol. Rights',
+                   'Gov. Fake News',
+                   #'Type of Regime',
                    'Equal Access',
-                   'Suffrage', 
+                   'Legal Suffrage', 
                    'Freedom of Expression',
                    'Clean Elections', 
-                   'Freedom of Assoc.', 
+                   'Freedom of Association.', 
 ]
 
 metric_descriptions = [
@@ -72,8 +85,8 @@ metric_descriptions = [
     "Question: How often do the government and its agents use social media to disseminate\n\
 misleading viewpoints or false information to influence its own population?",
 
-    "Question: How can the political regime overall be classified considering the competitiveness of\n\
-access to power (polyarchy) as well as liberal principles?",
+#     "Question: How can the political regime overall be classified considering the competitiveness of\n\
+# access to power (polyarchy) as well as liberal principles?",
     "Question: How equal is access to power?",
     "Question: What share of adult citizens as defined by statute has the legal right to vote in \
 national elections?",
@@ -92,25 +105,32 @@ metrics_inverse = {v: k for k, v in metrics_dict.items()} # Can remove if not us
 metrics_list_dicts = [{"label": x, "value": y} for x, y in zip(variables_names, available_variables)]
 
 # =============================================================================
-# DATAFRAMES SECTION.
+# LOADING CSV
 # =============================================================================
 
-identifying_columns = ["year", "country_text_id", "country_name"]
+identifying_columns = ["year", "country_text_id", "country_name", "e_regiongeo"]
 
 df_cols = identifying_columns + available_variables
-
-df = df_raw[df_cols]
+df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv", usecols=df_cols)
 
 df = df[df["year"].isin(range(2000, 2022 + 1))] # Desired year range.
 df = df.sort_values(by="year", ascending=True)
 
+
+# =============================================================================
+# LOADING CSV
+# =============================================================================
+
+
+# This scales the columns into a range of [0, 1] to standardize. Might be a better way?
+# The problem is that some metrics are not already standardized and instead have a [-4, 4] interval.
 def scale_column(column, lower_bound, upper_bound):
     min_val = column.min()
     max_val = column.max()
     scaled_column = (column - min_val) / (max_val - min_val) * (upper_bound - lower_bound) + lower_bound
     return scaled_column
 
-# Scale each column in the list to the range [0, 1]
+
 for column_name in available_variables:
     df[column_name] = scale_column(df[column_name], 0, 1)
 
@@ -118,8 +138,8 @@ df_for_dots = df.copy()
 df_for_dots = df_for_dots[df_for_dots["year"].isin([2022, 2000])]
 country_list = list(df_for_dots["country_name"].unique())
 for metric in available_variables:
+    
     df_for_dots[f"trend_{metric}"] = 0
-
     
     for country in country_list:
         country_df = df_for_dots[df_for_dots["country_name"] == country].fillna(0)
@@ -132,11 +152,25 @@ for metric in available_variables:
         difference = last_val - init_val
 
         df_for_dots.loc[df_for_dots["country_name"] == country, f"trend_{metric}"] = difference
-#df_for_dots = df_for_dots[df_for_dots["year"] == 2022]
+
 df_for_dots.sort_values(by="country_name", inplace=True)
 df_for_dots.reset_index(drop=True, inplace=True)
 
 dropdown_options = [{"label": country, "value": country} for country in df["country_name"].drop_duplicates()]
+
+
+eu_df = df[df["e_regiongeo"].isin(range(1, 5))].copy()
+eu_df["e_regiongeo"] = "Europe"
+
+afr_df = df[df["e_regiongeo"].isin(range(5, 10))].copy()
+afr_df["e_regiongeo"] = "Africa"
+
+asia_df = df[df["e_regiongeo"].isin(range(10, 16))].copy()
+asia_df["e_regiongeo"] = "Asia"
+
+amer_df = df[df["e_regiongeo"].isin(range(16, 20))].copy()
+amer_df["e_regiongeo"] = "Americas"
+
 
 
 #%% Dash App
@@ -148,11 +182,16 @@ dropdown_options = [{"label": country, "value": country} for country in df["coun
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = dbc.Container([
-    # The Choropleth Map Row
+
+    
+# First row items.
 
     dbc.Row([
+        
         # Choropleth Map
         dbc.Col([
+            html.H1(id="headline", style=abs_obj_style_3),
+            html.P(id="explanations", style=abs_obj_explanations),
             dcc.Graph(id="choropleth", style={
                       "height": "100%", "width": "100%"}),
 
@@ -160,16 +199,16 @@ app.layout = dbc.Container([
             html.Div([
                 html.P("Toggle Colorblind Mode"),
                 daq.BooleanSwitch(id='color_switch', on=False),
-                html.P("Select a Metric", style={"margin-bottom": 0}),
+                html.P("Select a Metric", style={"marginBottom": 0}),
                 # Metric Selector
                 dcc.Dropdown(
                     id="Democracy metric",
                     options=list(metrics_dict.keys()),
-                    value="Democracy",
+                    value=list(metrics_dict.keys())[0],
                     clearable=False,
                     multi=False,
                 ),
-                html.P("Select a Region", style={"margin-bottom": 0}),
+                html.P("Select a Region", style={"marginBottom": 0}),
                 dcc.Dropdown(
                     id="regions",
                     options=["World", "Europe", "Asia", "Africa",
@@ -179,42 +218,43 @@ app.layout = dbc.Container([
                 ),
             ], style=absolute_object_style)
 
-
-
         ], width=9, style=container_style),
+    
         dbc.Col([
-
-
-
-            dbc.Tabs([
-                dbc.Tab([
-                    html.P("Select countries here or use the map selection tools.", style={"margin":0}),
-                    dcc.Dropdown(
-                        id="multi_compare",
-                        # Removes duplicate country entries
-                        options=dropdown_options,
-                        value=["Denmark", "South Korea", "Hungary"], multi=True),  # Multi allows for multiple selections.
-                    dcc.Graph(id="compare_graph")
-                ], label="Comparison"),
-                dbc.Tab(
-                    dcc.Graph(id="area_chart"), label="Area Graph", disabled=False),
-            ]),
-            
-
+            dcc.Graph(id="select_country_graph", style={"height": "35vh", "textAlign": "left"}),
+            dcc.Graph(id="area_chart", style={"height": "35vh", "textAlign": "left"}), 
         ], width=3),
     ], style=row_1_style),
 
+    html.Hr(),
 
-    # Click country graph & most democratic states by year graph
-
+# Second row items.
     dbc.Row([
         dbc.Col([
-            dcc.Graph(id="select_country_graph", style={"height": "100%"}),
-            ],style={"height": "30vh"}, width=4
-        ),
+            dcc.Dropdown(
+                id="multi_compare",
+                options=dropdown_options,
+                value=["Denmark", "South Korea", "Hungary"], 
+                multi=True,
+                style={"margin":"0", "padding":"0"}
+                ),  # Multi allows for multiple selections.
+            dcc.Graph(id="compare_graph", 
+                      style={"height": "22vh", "margin":"0", "padding":"0"})
+            
+        ], width=4, style={"height": "100%"}),
+        
         dbc.Col(
-            dcc.Graph(id="global_trend", style={"height": "100%"}),
-            width=4, style={"height": "30vh"}),
+            
+            dbc.Tabs([
+                dbc.Tab(
+                   dcc.Graph(id="global_trend_1", style={"height": "22vh"}), 
+                label = "Line Graph"),
+                dbc.Tab(
+                   dcc.Graph(id="global_trend_2", style={"height": "22vh"}),
+                label = "Area Graph")
+            ]),
+            
+            width=4, style={"height": "100%"}),
         dbc.Col([
             dcc.Dropdown(
                 id="select_year",
@@ -222,12 +262,12 @@ app.layout = dbc.Container([
                          for x in df["year"].unique()],
                 value=2022,
                 clearable=False,
-                style={"position": "absolute", "z-index": "10000",
-                       "top": "-2%", "left": "36%", "width": 100}
+                style={"position": "absolute", "zIndex": "10000",
+                       "top": "-3%", "right": "10%", "width": 100}
             ),
             dcc.Graph(id="min_max_graph", style={"height": "100%"}),
-        ], style={"height": "30vh", "position": "relative"}, width=4)
-    ]),
+        ], style={"height": "100%", "position": "relative"}, width=4)
+    ], style={"height": "25vh"}),
 
 
 
@@ -277,14 +317,13 @@ def update_select_country(selected_metric, selected_country):
                                 yanchor='auto')
     
 
-    fig_selected_country.update_traces(hovertemplate=None)
+    fig_selected_country.update_traces(hovertemplate=None, showlegend=False)
     fig_selected_country.update_layout(
         hovermode='x unified',
-        xaxis_title="Year",
-        yaxis_title=selected_metric,
+        xaxis_title="",
+        yaxis_title="",
         margin=dict(l=0, r=0, t=10, b=10),
-        legend_orientation='h',
-        legend_title_text='',
+        xaxis=dict(tickmode='linear')
     ),
 
     fig_selected_country.update_yaxes(
@@ -335,11 +374,13 @@ def update_comparison(selected_metric, compare, box_select):
     fig_comparison.update_xaxes(rangeslider_visible=False)
 
     fig_comparison.update_layout(
-        xaxis_title="Year",
+        xaxis_title="",
         yaxis_title="",
         margin=dict(l=0, r=0, t=20, b=0),
-        legend_orientation='h',
+        legend_orientation='v',
         legend_title_text='',
+        showlegend=False,
+        #xaxis=dict(tickmode='linear')
     )
     
     fig_comparison.update_yaxes(
@@ -416,12 +457,6 @@ def update_choropleth(selected_metric, selected_region, clicked, switch, old_fig
             text='Source: <a href="https://v-dem.net/data/the-v-dem-dataset/", target="_blank">The V-Dem Dataset</a>',
             showarrow=False
         ),
-            dict(
-                x = 0.5,
-                y = 0.0,
-                text = f'{descriptions_dict[selected_metric]}',
-                showarrow=False
-                )
             ],
 
         updatemenus=[dict(y=0.1)],
@@ -467,9 +502,9 @@ def update_choropleth(selected_metric, selected_region, clicked, switch, old_fig
 
     third_layer_fig_selection = go.Choropleth(
         locations=[clicked["points"][0]["location"]] if clicked else [""],
-        z=[1],  # So that country is maximum purple. Or whichever other color.
+        z=[1],
         locationmode="ISO-3",
-        #colorscale=[[0, "black" if switch else "yellow"]],
+        #colorscale=[[0, "black" if switch else "yellow"]], 
         showscale=False,  # Hides the color scale.
         hoverinfo='skip',
     )
@@ -511,7 +546,7 @@ def update_min_max_graph(year, selected_metric, old_fig):
         min_max_df,
         x=column,
         y='country_name',
-        title=f"Most and least democratic states in {year}",
+        title=f"Best and Worst in {selected_metric}",
         color=column,
         color_continuous_scale='Blues'
     )
@@ -546,7 +581,7 @@ def update_area_chart(selected_metric, clicked):
     grouped_df = df[df["country_text_id"] == clicked]
 
     grouped_df = grouped_df[grouped_df["year"].between(
-        1980, 2022)].groupby("year").mean().reset_index()
+        2000, 2022)].groupby("year").mean().reset_index()
 
     plot = go.Figure()
     n_metrics = 0
@@ -559,8 +594,9 @@ def update_area_chart(selected_metric, clicked):
             y=grouped_df[value],
             stackgroup='one',
         ))
-    plot.update_yaxes(range=(0, n_metrics+1))
+    plot.update_yaxes(range=(0, n_metrics+1), autorange=True,)
     plot.update_layout(
+        hovermode='x unified',
         margin=dict(l=0, r=0, t=10, b=0),
         legend_orientation='h',
     )
@@ -569,27 +605,108 @@ def update_area_chart(selected_metric, clicked):
 
 
 @app.callback(
-    Output('global_trend', 'figure'),
+    Output('global_trend_1', 'figure'),
     Input("Democracy metric", "value"),
 )
 
-def update_global_trends_graph(selected_metric):
+def update_global_trends_line(selected_metric):
     column = metrics_dict[selected_metric]
     df_sum = df.groupby('year')[column].mean().reset_index()
 
     # Plot using px.line
     global_fig = px.line(df_sum, x='year', y=column, title='Global Trends')
     global_fig.update_layout(
-        xaxis_title="Year",
+        xaxis_title="",
         yaxis_title=f"{selected_metric}",
         coloraxis_showscale=False,
         template='plotly_white',
         hovermode='x unified',
-        margin=dict(l=0, r=0, t=30, b=10),
+        margin=dict(l=0, r=0, t=30, b=0),
     )
     
    
     return global_fig
 
+@app.callback(
+    Output('global_trend_2', 'figure'),
+    Input("Democracy metric", "value"),
+)
+
+def update_global_trends_area(selected_metric):
+    
+    column = metrics_dict[selected_metric]
+    eu_mean = eu_df.groupby("year")[column].mean().reset_index()
+    afr_mean = afr_df.groupby("year")[column].mean().reset_index()
+    asia_mean = asia_df.groupby("year")[column].mean().reset_index()
+    amer_mean = amer_df.groupby("year")[column].mean().reset_index()
+        
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=eu_mean["year"], y=eu_mean[column],
+        hoverinfo='x+y',
+        mode='lines',
+        stackgroup='one', # define stack group
+        name="Europe"
+    ))
+    fig.add_trace(go.Scatter(
+        x=afr_mean["year"], y=afr_mean[column],
+        hoverinfo='x+y',
+        mode='lines',
+        stackgroup='one',
+        name="Africa"
+    ))
+    fig.add_trace(go.Scatter(
+        x=asia_mean["year"], y=asia_mean[column],
+        hoverinfo='x+y',
+        mode='lines',
+        stackgroup='one',
+        name="Asia"
+    ))
+    fig.add_trace(go.Scatter(
+        x=amer_mean["year"], y=amer_mean[column],
+        hoverinfo='x+y',
+        mode='lines',
+        stackgroup='one',
+        name="Americas"
+    ))
+    
+    fig.update_layout(
+        xaxis_title="",
+        yaxis_title=f"{selected_metric}",
+        coloraxis_showscale=False,
+        template='plotly_white',
+        hovermode='x unified',
+        margin=dict(l=0, r=0, t=30, b=0),
+    )
+
+    return fig
+
+
+
+
+
+@app.callback(
+    Output("headline", 'children'),
+    Input("Democracy metric", "value"),
+    Input("regions", "value"),
+)
+
+def update_headline(selected_metric, region):
+    if region.lower() == "world":
+        region = "the world"
+    title = f"{selected_metric.upper()} IN {region.upper()}"
+    return title
+
+
+@app.callback(
+    Output("explanations", 'children'),
+    Input("Democracy metric", "value"),
+)
+
+def update_metric_text(selected_metric):
+    text = descriptions_dict[selected_metric]
+    
+    return text
 
 app.run_server(debug=True, use_reloader=False) # Can also set to true, but doesn"t work for me for some reason.
