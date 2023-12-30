@@ -14,8 +14,10 @@ container_style = {"position":"relative"}
 absolute_object_style = {"position":"absolute", "z-index":"10000", "bottom":"25%", "left":"5%"}
 absolute_object_style_2 = {"position":"absolute", "z-index":"10000", "bottom":"35%", "left":"5%"}
 
+my_path = '/Users/ejvindbrandt/Documents/Uni/SDU/visualization/vis_exam/V-Dem-CY-Full+Others-v13.csv'
+
 # You can replace this with a less.. heavy version of the csv.
-df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv")
+df = pd.read_csv(my_path)
 
 available_variables = ['v2x_polyarchy', 'v2x_suffr', 'v2xel_frefair', 'v2x_freexp_altinf', 'v2x_frassoc_thick', 'v2x_elecoff']
 variables_names = ['Democracy', 'Suffrage', 'free and fair', 'free', 'frassoq', 'election']
@@ -107,19 +109,33 @@ app.layout = dbc.Container([
             
         ], width=9, style=container_style),
         dbc.Col([
+            dcc.Dropdown(
+                id="multi_compare", 
+                options=[{"label": country, "value": country} for country in df["country_name"].drop_duplicates()], # Removes duplicate country entries
+                value=["Denmark", "South Korea", "Hungary"], multi=True), # Multi allows for multiple selections.
             
 
 
             dbc.Tabs([
                 dbc.Tab([
                     dcc.Dropdown(
-                        id="multi_compare", 
-                        options=[{"label": country, "value": country} for country in df["country_name"].drop_duplicates()], # Removes duplicate country entries
-                        value=["Denmark", "South Korea", "Hungary"], multi=True), # Multi allows for multiple selections.
-                        dcc.Graph(id="compare_graph")
-                ], label="Comparison"),
-                dbc.Tab(
-                    dcc.Graph(id="area_chart"), label="Area Graph", disabled=False),
+                         id="select_variable",
+                         options=[{"label": x, "value": y} for x, y in metrics_dict.items()],
+                         value='v2x_polyarchy',
+                         clearable=False,
+                         style={"position":"absolute", "z-index":"10000", "top":"-2%", "left":"36%", "width":100}
+                     ),
+                    dcc.Graph(id="compare_graph")], label="Comparison"),
+                dbc.Tab([
+                    dcc.Dropdown(
+                         id="select_year",
+                         options=[{"label": x, "value": x} for x in df["year"].unique()],
+                         value=2022,
+                         clearable=False,
+                         style={"position":"absolute", "z-index":"10000", "top":"-2%", "left":"36%", "width":100}
+                     ),
+                    dcc.Graph(id="radar_chart")], 
+                    label="Radar Graph", disabled=False),
             ]),
             
             ], width=3),
@@ -139,13 +155,7 @@ app.layout = dbc.Container([
             style={"height":"30vh"}, width=6
         ),
         dbc.Col([
-           dcc.Dropdown(
-                id="select_year",
-                options=[{"label": x, "value": x} for x in df["year"].unique()],
-                value=2022,
-                clearable=False,
-                style={"position":"absolute", "z-index":"10000", "top":"-2%", "left":"36%", "width":100}
-            ),
+           
             dcc.Graph(id="min_max_graph", style={"height":"100%"}) 
         ], style={"height":"30vh", "position":"relative"}, width=6)
     ]),
@@ -418,41 +428,30 @@ def update_min_max_graph(year, selected_metric, old_fig):
     
     return fig_combined
 
-@app.callback(
-    Output('area_chart', 'figure'),
-    Input("Democracy metric", "value"),
-    Input("choropleth", "clickData")
-)
-
-def update_area_chart(selected_metric, clicked):
+    @app.callback(
+        Output('radar_chart', 'figure'),
+        Input('select_year', 'value'),
+        Input("multi_compare", "value")
+    )
+    def update_radar_graph(selected_year, selected_countries):
     
-    if not clicked:
-        clicked = "MMR"
-    else:
-        clicked = clicked["points"][0]["location"]
-
-    grouped_df = df[df["country_text_id"] == clicked]
-    
-    grouped_df = grouped_df[grouped_df["year"].between(1980, 2022)].groupby("year").mean().reset_index()
-    
-    
-    plot = go.Figure()
-    n_metrics = 0
-    for name, value in metrics_dict.items():
-        n_metrics += 1
-        df[value] = MinMaxScaler().fit_transform(df[[value]])
-        plot.add_trace(go.Scatter( 
-            name = name, 
-            x = grouped_df["year"],
-            y = grouped_df[value], 
-            stackgroup='one',
-       ))
-    plot.update_yaxes(range=(0, n_metrics+1))
-    plot.update_layout(
-        margin=dict(l=0, r=0, t=10, b=0)
-        )
-  
-    return plot
+        # selects countries for a given year
+        select_df = df.loc[(df["country_name"].isin(selected_countries)) & (df["year"] == selected_year)]
+        
+        fig = go.Figure()
+        
+        # Loop through each country and add a trace
+        for country in selected_countries:
+            fig.add_trace(go.Scatterpolar(
+                # get values from df 
+                r= select_df.loc[select_df['country_name'] == country:, metrics_dict.values()].values.tolist(), # taking all available variables
+                theta=list(metrics_dict.keys()), # names on available variables
+                fill='toself',
+                name=country
+            ))
+        
+        
+        return fig
 
 
 
