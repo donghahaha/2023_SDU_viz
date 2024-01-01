@@ -14,18 +14,6 @@ import numpy as np
 # =============================================================================
 row_1_style = {"height":"70vh"}
 container_style = {"position":"relative"}
-<<<<<<< HEAD
-absolute_object_style = {"position":"absolute", "z-index":"10000", "bottom":"25%", "left":"5%"}
-absolute_object_style_2 = {"position":"absolute", "z-index":"10000", "bottom":"35%", "left":"5%"}
-
-my_path = '/Users/ejvindbrandt/Documents/Uni/SDU/visualization/vis_exam/V-Dem-CY-Full+Others-v13.csv'
-
-# You can replace this with a less.. heavy version of the csv.
-df = pd.read_csv(my_path)
-
-available_variables = ['v2x_polyarchy', 'v2x_suffr', 'v2xel_frefair', 'v2x_freexp_altinf', 'v2x_frassoc_thick', 'v2x_elecoff']
-variables_names = ['Democracy', 'Suffrage', 'free and fair', 'free', 'frassoq', 'election']
-=======
 absolute_object_style = {"position":"absolute", "zIndex":"10000", "bottom":"25%", "left":"5%"}
 absolute_object_style_2 = {"position":"absolute", "zIndex":"10000", "bottom":"35%", "left":"5%"}
 abs_obj_style_3 = {
@@ -110,7 +98,6 @@ to form and to participate in elections, and to what extent are civil society \
 ]
 
 descriptions_dict = dict(zip(variables_names, metric_descriptions))
->>>>>>> 5860fc874c1f1e71a9d0361d8442b6f207faa063
 
 metrics_dict=dict(zip(variables_names, available_variables))
 metrics_inverse = {v: k for k, v in metrics_dict.items()} # Can remove if not used.
@@ -124,7 +111,7 @@ metrics_list_dicts = [{"label": x, "value": y} for x, y in zip(variables_names, 
 identifying_columns = ["year", "country_text_id", "country_name", "e_regiongeo"]
 
 df_cols = identifying_columns + available_variables
-df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv", usecols=df_cols)
+df = pd.read_csv("/Users/ejvindbrandt/Documents/Uni/SDU/visualization/vis_exam/V-Dem-CY-Full+Others-v13.csv", usecols=df_cols)
 
 df = df[df["year"].isin(range(2000, 2022 + 1))] # Desired year range.
 df = df.sort_values(by="year", ascending=True)
@@ -234,18 +221,10 @@ app.layout = dbc.Container([
         ], width=9, style=container_style),
     
         dbc.Col([
-<<<<<<< HEAD
-            dcc.Dropdown(
-                id="multi_compare", 
-                options=[{"label": country, "value": country} for country in df["country_name"].drop_duplicates()], # Removes duplicate country entries
-                value=["Denmark", "South Korea", "Hungary"], multi=True), # Multi allows for multiple selections.
-            
-=======
             dcc.Graph(id="select_country_graph", style={"height": "35vh", "textAlign": "left"}),
             dcc.Graph(id="area_chart", style={"height": "35vh", "textAlign": "left"}), 
         ], width=3),
     ], style=row_1_style),
->>>>>>> 5860fc874c1f1e71a9d0361d8442b6f207faa063
 
     html.Hr(),
 
@@ -259,57 +238,30 @@ app.layout = dbc.Container([
                 multi=True,
                 style={"margin":"0", "padding":"0"}
                 ),  # Multi allows for multiple selections.
-            dcc.Graph(id="compare_graph", 
-                      style={"height": "22vh", "margin":"0", "padding":"0"})
+                dbc.Tabs([
+                    dbc.Tab(
+                       dcc.Graph(id="compare_graph", style={"height": "22vh", "margin":"0", "padding":"0"}), 
+                    label = "Single variable over time"),
+                    dbc.Tab(
+                       dcc.Graph(id="radar-chart", style={"height": "22vh", "margin":"-10", "padding":"0"}), 
+                    label = "All varibles for a single year")
+                ])
             
         ], width=4, style={"height": "100%"}),
         
         dbc.Col(
             
             dbc.Tabs([
-<<<<<<< HEAD
-                dbc.Tab([
-                    dcc.Dropdown(
-                         id="select_variable",
-                         options=[{"label": x, "value": y} for x, y in metrics_dict.items()],
-                         value='v2x_polyarchy',
-                         clearable=False,
-                         style={"position":"absolute", "z-index":"10000", "top":"-2%", "left":"36%", "width":100}
-                     ),
-                    dcc.Graph(id="compare_graph")], label="Comparison"),
-                dbc.Tab([
-                    dcc.Dropdown(
-                         id="select_year",
-                         options=[{"label": x, "value": x} for x in df["year"].unique()],
-                         value=2022,
-                         clearable=False,
-                         style={"position":"absolute", "z-index":"10000", "top":"-2%", "left":"36%", "width":100}
-                     ),
-                    dcc.Graph(id="radar_chart")], 
-                    label="Radar Graph", disabled=False),
-=======
                 dbc.Tab(
                    dcc.Graph(id="global_trend_1", style={"height": "22vh"}), 
                 label = "Line Graph"),
                 dbc.Tab(
                    dcc.Graph(id="global_trend_2", style={"height": "22vh"}),
                 label = "Area Graph")
->>>>>>> 5860fc874c1f1e71a9d0361d8442b6f207faa063
             ]),
             
             width=4, style={"height": "100%"}),
         dbc.Col([
-<<<<<<< HEAD
-           
-            dcc.Graph(id="min_max_graph", style={"height":"100%"}) 
-        ], style={"height":"30vh", "position":"relative"}, width=6)
-    ]),
-    
-    
-    
-    
-], fluid=True, style = {"height":"100vh"}) # Sets the dbc container to fill the entire page
-=======
             dcc.Dropdown(
                 id="select_year",
                 options=[{"label": x, "value": x}
@@ -325,9 +277,7 @@ app.layout = dbc.Container([
 
 
 
-
 ], fluid=True, style={"height": "100vh"})  # Sets the dbc container to fill the entire page
->>>>>>> 5860fc874c1f1e71a9d0361d8442b6f207faa063
 
 
 # =============================================================================
@@ -443,6 +393,37 @@ def update_comparison(selected_metric, compare, box_select):
     )
 
     return fig_comparison
+
+
+@app.callback(
+    Output('radar-chart', 'figure'),
+    Input('multi_compare', 'value'),
+    Input('select_year', 'value'),
+)
+def update_radar_chart(selected_countries, selected_year):
+    
+    fig = go.Figure()
+    
+    for country in selected_countries:        
+        selected_df = df.loc[(df['country_name'] == country) & (df['year'] == selected_year)]
+        r_data = selected_df[metrics_dict.values()].values.flatten()
+        fig.add_trace(go.Scatterpolar(
+              r=r_data,
+              theta=list(metrics_dict.keys()),
+              fill='toself',
+              name= country
+              ))
+
+        fig.update_layout(
+          polar=dict(
+            radialaxis=dict(
+              visible=True
+            )),
+          showlegend=True,
+          margin=dict(l=0, r=0, t=10, b=15) # sizes the plot
+        )
+
+    return fig
 
 
 @app.callback(
@@ -603,7 +584,7 @@ def update_min_max_graph(year, selected_metric, old_fig):
         y='country_name',
         title=f"Best and Worst in {selected_metric}",
         color=column,
-        color_continuous_scale='Blues'
+        color_continuous_scale='RdBu'
     )
 
     fig_combined.update_layout(
@@ -620,32 +601,6 @@ def update_min_max_graph(year, selected_metric, old_fig):
 
     return fig_combined
 
-<<<<<<< HEAD
-    @app.callback(
-        Output('radar_chart', 'figure'),
-        Input('select_year', 'value'),
-        Input("multi_compare", "value")
-    )
-    def update_radar_graph(selected_year, selected_countries):
-    
-        # selects countries for a given year
-        select_df = df.loc[(df["country_name"].isin(selected_countries)) & (df["year"] == selected_year)]
-        
-        fig = go.Figure()
-        
-        # Loop through each country and add a trace
-        for country in selected_countries:
-            fig.add_trace(go.Scatterpolar(
-                # get values from df 
-                r= select_df.loc[select_df['country_name'] == country:, metrics_dict.values()].values.tolist(), # taking all available variables
-                theta=list(metrics_dict.keys()), # names on available variables
-                fill='toself',
-                name=country
-            ))
-        
-        
-        return fig
-=======
 
 @app.callback(
     Output('area_chart', 'figure'),
@@ -683,7 +638,6 @@ def update_area_chart(selected_metric, clicked):
     )
 
     return plot
->>>>>>> 5860fc874c1f1e71a9d0361d8442b6f207faa063
 
 
 @app.callback(
@@ -763,8 +717,6 @@ def update_global_trends_area(selected_metric):
     )
 
     return fig
-
-
 
 
 
