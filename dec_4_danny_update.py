@@ -216,6 +216,14 @@ app.layout = dbc.Container([
                     value="World",
                     clearable=False
                 ),
+                html.P("Select a year", style={"marginBottom": 0}),
+                dcc.Dropdown(
+                    id="select_year",
+                    options=[{"label": x, "value": x}
+                             for x in df["year"].unique()],
+                    value=2022,
+                    clearable=False
+                ),
             ], style=absolute_object_style)
 
         ], width=9, style=container_style),
@@ -262,15 +270,6 @@ app.layout = dbc.Container([
             
             width=4, style={"height": "100%"}),
         dbc.Col([
-            dcc.Dropdown(
-                id="select_year",
-                options=[{"label": x, "value": x}
-                         for x in df["year"].unique()],
-                value=2022,
-                clearable=False,
-                style={"position": "absolute", "zIndex": "10000",
-                       "top": "-3%", "right": "10%", "width": 100}
-            ),
             dcc.Graph(id="min_max_graph", style={"height": "100%"}),
         ], style={"height": "100%", "position": "relative"}, width=4)
     ], style={"height": "25vh"}),
@@ -420,11 +419,12 @@ def update_radar_chart(selected_countries, selected_year):
               visible=True
             )),
           showlegend=True,
+          legend_title_text=f"Year: {selected_year} <br /> <br />Showing countries:",
+
           margin=dict(l=0, r=0, t=10, b=15) # sizes the plot
         )
 
     return fig
-
 
 @app.callback(
     Output("choropleth", "figure"),
@@ -582,7 +582,7 @@ def update_min_max_graph(year, selected_metric, old_fig):
         min_max_df,
         x=column,
         y='country_name',
-        title=f"Best and Worst in {selected_metric}",
+        title=f"Best and Worst in {selected_metric} in {year}",
         color=column,
         color_continuous_scale='RdBu'
     )
