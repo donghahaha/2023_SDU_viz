@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+
+
 #%% Preparing Data
 import pandas as pd
 import plotly.express as px
@@ -43,16 +46,21 @@ abs_obj_explanations = {
 # =============================================================================
 
 available_variables = ['v2x_polyarchy',
-                       'v2x_clphy',
-                       'v2smonper',
-                       'v2x_gender',
-                       'v2smgovdom',
-                       #'v2x_regime_amb',
-                       'v2xeg_eqaccess',
                        'v2x_suffr',
-                       'v2x_freexp_altinf',
                        'v2xel_frefair', 
                        'v2x_frassoc_thick', 
+                       'v2xeg_eqaccess',
+                       
+                       'v2x_clphy',
+                       'v2smonper',
+                       'v2x_freexp_altinf',
+                       'v2smgovdom',
+                       #'v2x_regime_amb',
+                       
+                       'v2x_gender',
+                       
+                       
+                       
 ]
 
 #'v2exl_legitlead', # cult of personality
@@ -62,39 +70,48 @@ available_variables = ['v2x_polyarchy',
 # 'v2smgovfilprc' # Internet filtering in practice
 
 variables_names = ['Electoral Democracy',
+                   'Legal Suffrage', 
+                   'Clean Elections', 
+                   'Freedom of Association.',
+                   'Equal Access',
+                   
                    'Freedom from Violence',
                    'Online Media Pluralism',
-                   'Women\'s Pol. Rights',
+                   'Freedom of Expression',
                    'Gov. Fake News',
                    #'Type of Regime',
-                   'Equal Access',
-                   'Legal Suffrage', 
-                   'Freedom of Expression',
-                   'Clean Elections', 
-                   'Freedom of Association.', 
+                   
+                   'Women\'s Pol. Rights',
+                   
+                   
+                    
 ]
 
 metric_descriptions = [
     "Question: To what extent is the ideal of electoral democracy in its fullest sense achieved?",
-
+    "Question: What share of adult citizens as defined by statute has the legal right to vote in \
+national elections?",
+    "Question: To what extent are elections free and fair?",
+    "Question: To what extent are parties, including opposition parties, allowed\n\
+to form and to participate in elections, and to what extent are civil society \
+            \norganizations able to form and to operate freely?",
+    "Question: How equal is access to power?",
     "Question: To what extent is physical integrity respected?\nClarification: Physical integrity is understood as freedom from political killings and torture by the government.",
+            
+            
 
     "Question: Do the major domestic online media outlets represent a wide range of political perspectives?",
+    "Question: To what extent does government respect [expression for press media, academicia, and private persons]?",
 
-    "Question: How politically empowered are women?",
     "Question: How often do the government and its agents use social media to disseminate\n\
 misleading viewpoints or false information to influence its own population?",
 
 #     "Question: How can the political regime overall be classified considering the competitiveness of\n\
 # access to power (polyarchy) as well as liberal principles?",
-    "Question: How equal is access to power?",
-    "Question: What share of adult citizens as defined by statute has the legal right to vote in \
-national elections?",
-    "Question: To what extent does government respect [expression for press media, academicia, and private persons]?",
-    "Question: To what extent are elections free and fair?",
-    "Question: To what extent are parties, including opposition parties, allowed\n\
-to form and to participate in elections, and to what extent are civil society \
-            \norganizations able to form and to operate freely?",
+
+
+    "Question: How politically empowered are women?",
+
 ]
 
 descriptions_dict = dict(zip(variables_names, metric_descriptions))
@@ -111,7 +128,7 @@ metrics_list_dicts = [{"label": x, "value": y} for x, y in zip(variables_names, 
 identifying_columns = ["year", "country_text_id", "country_name", "e_regiongeo"]
 
 df_cols = identifying_columns + available_variables
-df = pd.read_csv("/Users/ejvindbrandt/Documents/Uni/SDU/visualization/vis_exam/V-Dem-CY-Full+Others-v13.csv", usecols=df_cols)
+df = pd.read_csv("V-Dem-CY-Full+Others-v13.csv", usecols=df_cols)
 
 df = df[df["year"].isin(range(2000, 2022 + 1))] # Desired year range.
 df = df.sort_values(by="year", ascending=True)
@@ -197,7 +214,7 @@ app.layout = dbc.Container([
 
             # Region Selector
             html.Div([
-                html.P("Toggle Colorblind Mode"),
+                html.P("Toggle Colorblind Mode", style={"marginBottom":0}),
                 daq.BooleanSwitch(id='color_switch', on=False),
                 html.P("Select a Metric", style={"marginBottom": 0}),
                 # Metric Selector
@@ -216,21 +233,17 @@ app.layout = dbc.Container([
                     value="World",
                     clearable=False
                 ),
-                html.P("Select a year", style={"marginBottom": 0}),
-                dcc.Dropdown(
-                    id="select_year",
-                    options=[{"label": x, "value": x}
-                             for x in df["year"].unique()],
-                    value=2022,
-                    clearable=False
-                ),
             ], style=absolute_object_style)
 
         ], width=9, style=container_style),
     
         dbc.Col([
-            dcc.Graph(id="select_country_graph", style={"height": "35vh", "textAlign": "left"}),
-            dcc.Graph(id="area_chart", style={"height": "35vh", "textAlign": "left"}), 
+            dcc.Graph(id="select_country_graph", 
+                      style={"height": "30vh", "textAlign": "left", "marginTop":"5vh"}
+                      ),
+            dcc.Graph(id="area_chart", 
+                      style={"height": "30vh", "textAlign": "left"}
+                      ), 
         ], width=3),
     ], style=row_1_style),
 
@@ -249,10 +262,19 @@ app.layout = dbc.Container([
                 dbc.Tabs([
                     dbc.Tab(
                        dcc.Graph(id="compare_graph", style={"height": "22vh", "margin":"0", "padding":"0"}), 
-                    label = "Single variable over time"),
-                    dbc.Tab(
-                       dcc.Graph(id="radar-chart", style={"height": "22vh", "margin":"-10", "padding":"0"}), 
-                    label = "All varibles for a single year")
+                    label = "Line (Multiple Years)"),
+                    dbc.Tab([
+                       dcc.Graph(id="radar-chart", style={"height": "22vh", "margin":"-10", "padding":"0"}),
+                       dcc.Dropdown(
+                           id="select_year_radar",
+                           options=[{"label": x, "value": x}
+                                    for x in df["year"].unique()],
+                           value=2022,
+                           clearable=False,
+                           style={"position": "absolute", "zIndex": "10000",
+                                  "top": "0", "left": "0%", "width": 100}
+                       ),
+                    ], label = "Radar (Single Year)", style={"position":"relative"})
                 ])
             
         ], width=4, style={"height": "100%"}),
@@ -262,14 +284,23 @@ app.layout = dbc.Container([
             dbc.Tabs([
                 dbc.Tab(
                    dcc.Graph(id="global_trend_1", style={"height": "22vh"}), 
-                label = "Line Graph"),
+                label = "Line (Global Trend)"),
                 dbc.Tab(
                    dcc.Graph(id="global_trend_2", style={"height": "22vh"}),
-                label = "Area Graph")
+                label = "Area (Continents Trend)")
             ]),
             
             width=4, style={"height": "100%"}),
         dbc.Col([
+            dcc.Dropdown(
+                id="select_year",
+                options=[{"label": x, "value": x}
+                         for x in df["year"].unique()],
+                value=2022,
+                clearable=False,
+                style={"position": "absolute", "zIndex": "10000",
+                       "top": "-3%", "right": "10%", "width": 100}
+            ),
             dcc.Graph(id="min_max_graph", style={"height": "100%"}),
         ], style={"height": "100%", "position": "relative"}, width=4)
     ], style={"height": "25vh"}),
@@ -326,8 +357,9 @@ def update_select_country(selected_metric, selected_country):
         hovermode='x unified',
         xaxis_title="",
         yaxis_title="",
-        margin=dict(l=0, r=0, t=10, b=10),
-        xaxis=dict(tickmode='linear')
+        margin=dict(l=0, r=0, t=30, b=10),
+        xaxis=dict(tickmode='linear'),
+        title=f"{selected_metric}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}"
     ),
 
     fig_selected_country.update_yaxes(
@@ -336,9 +368,9 @@ def update_select_country(selected_metric, selected_country):
         autorange=True,
     )
     
-    fig_selected_country.add_annotation(text=f"{selected_metric}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}",
-                                        xref="paper", yref="paper",
-                                        x=0.5, y=0.1, showarrow=False)
+    # fig_selected_country.add_annotation(text=f"{selected_metric}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}",
+    #                                     xref="paper", yref="paper",
+    #                                     x=0.5, y=0.1, showarrow=False)
 
     return fig_selected_country
 
@@ -397,7 +429,7 @@ def update_comparison(selected_metric, compare, box_select):
 @app.callback(
     Output('radar-chart', 'figure'),
     Input('multi_compare', 'value'),
-    Input('select_year', 'value'),
+    Input('select_year_radar', 'value'),
 )
 def update_radar_chart(selected_countries, selected_year):
     
@@ -419,12 +451,12 @@ def update_radar_chart(selected_countries, selected_year):
               visible=True
             )),
           showlegend=True,
-          legend_title_text=f"Year: {selected_year} <br /> <br />Showing countries:",
-
+          legend_orientation='h',
           margin=dict(l=0, r=0, t=10, b=15) # sizes the plot
         )
 
     return fig
+
 
 @app.callback(
     Output("choropleth", "figure"),
@@ -582,7 +614,7 @@ def update_min_max_graph(year, selected_metric, old_fig):
         min_max_df,
         x=column,
         y='country_name',
-        title=f"Best and Worst in {selected_metric} in {year}",
+        title=f"Best and Worst in {selected_metric}",
         color=column,
         color_continuous_scale='RdBu'
     )
@@ -633,8 +665,9 @@ def update_area_chart(selected_metric, clicked):
     plot.update_yaxes(range=(0, n_metrics+1), autorange=True,)
     plot.update_layout(
         hovermode='x unified',
-        margin=dict(l=0, r=0, t=10, b=0),
+        margin=dict(l=0, r=0, t=30, b=0),
         legend_orientation='h',
+        title=f"{selected_metric}: {df.loc[df['country_text_id'] == clicked, 'country_name'].iloc[0]}"
     )
 
     return plot
@@ -650,7 +683,7 @@ def update_global_trends_line(selected_metric):
     df_sum = df.groupby('year')[column].mean().reset_index()
 
     # Plot using px.line
-    global_fig = px.line(df_sum, x='year', y=column, title='Global Trends')
+    global_fig = px.line(df_sum, x='year', y=column, title=f'Global Trends in {selected_metric}')
     global_fig.update_layout(
         xaxis_title="",
         yaxis_title=f"{selected_metric}",
