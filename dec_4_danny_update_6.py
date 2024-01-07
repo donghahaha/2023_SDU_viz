@@ -45,73 +45,38 @@ abs_obj_explanations = {
 # CSV COLUMN SELECTION, METRICS & MORE
 # =============================================================================
 
-available_variables = ['v2x_polyarchy',
-                       'v2x_suffr',
+available_variables = [
+                        'v2x_polyarchy',
                        'v2xel_frefair', 
-                       'v2x_frassoc_thick', 
-                       'v2xeg_eqaccess',
-                       
-                       'v2x_clphy',
-                       'v2smonper',
                        'v2x_freexp_altinf',
+                       'v2x_elecoff',
+                       'v2x_suffr',
+                       'v2x_frassoc_thick',
+                       'v2x_clphy',
                        'v2smgovdom',
-                       #'v2x_regime_amb',
-                       
-                       'v2x_gender',
-                       
-                       
-                       
 ]
 
-#'v2exl_legitlead', # cult of personality
-#'v2x_freexp_altinf', 
-# 'v2mecenefm', # Traditional media censorship
-# 'v2mecenefi' # internet censorship
-# 'v2smgovfilprc' # Internet filtering in practice
-
-variables_names = ['Electoral Democracy',
-                   'Legal Suffrage', 
-                   'Clean Elections', 
-                   'Freedom of Association.',
-                   'Equal Access',
-                   
-                   'Freedom from Violence',
-                   'Online Media Pluralism',
+variables_names = [
+                   'Electoral Democracy',
+                   'Free and fair elections', 
                    'Freedom of Expression',
+                   'Elected officials',
+                   'Share of population with suffrage',
+                   'Freedom of association',
+                   'Freedom from Violence',
                    'Gov. Fake News',
-                   #'Type of Regime',
-                   
-                   'Women\'s Pol. Rights',
-                   
-                   
-                    
 ]
 
 metric_descriptions = [
     "Question: To what extent is the ideal of electoral democracy in its fullest sense achieved?",
-    "Question: What share of adult citizens as defined by statute has the legal right to vote in \
-national elections?",
     "Question: To what extent are elections free and fair?",
-    "Question: To what extent are parties, including opposition parties, allowed\n\
-to form and to participate in elections, and to what extent are civil society \
-            \norganizations able to form and to operate freely?",
-    "Question: How equal is access to power?",
-    "Question: To what extent is physical integrity respected?\nClarification: Physical integrity is understood as freedom from political killings and torture by the government.",
-            
-            
-
-    "Question: Do the major domestic online media outlets represent a wide range of political perspectives?",
-    "Question: To what extent does government respect [expression for press media, academicia, and private persons]?",
-
+    "Question: To what extent does government respect expression for press media, academicia, and private persons?",
     "Question: How often do the government and its agents use social media to disseminate\n\
-misleading viewpoints or false information to influence its own population?",
-
-#     "Question: How can the political regime overall be classified considering the competitiveness of\n\
-# access to power (polyarchy) as well as liberal principles?",
-
-
-    "Question: How politically empowered are women?",
-
+    misleading viewpoints or false information to influence its own population?",
+    'Question: What share of adult citizens as defined by statute has the legal right to vote in national elections?',
+    'Question: To what extent are parties, including opposition parties, allowed to form and to participate in elections, and to what extent are civil society organizations able to form and to operate freely?',
+    "Question: To what extent is physical integrity respected?\nClarification: Physical integrity is understood as freedom from political killings and torture by the government.",
+    'Question: How often do the government and its agents use social media to disseminate misleading viewpoints or false information to influence its own population?'
 ]
 
 descriptions_dict = dict(zip(variables_names, metric_descriptions))
@@ -128,7 +93,7 @@ metrics_list_dicts = [{"label": x, "value": y} for x, y in zip(variables_names, 
 identifying_columns = ["year", "country_text_id", "country_name", "e_regiongeo"]
 
 df_cols = identifying_columns + available_variables
-df = pd.read_csv("V-Dem-CY-FullOthers_csv_v13/V-Dem-CY-Full+Others-v13.csv")
+df = pd.read_csv("/Users/ejvindbrandt/Documents/Uni/SDU/visualization/vis_exam/V-Dem-CY-Full+Others-v13.csv", usecols=df_cols)
 
 df = df[df["year"].isin(range(2000, 2022 + 1))] # Desired year range.
 df = df.sort_values(by="year", ascending=True)
@@ -214,9 +179,7 @@ app.layout = dbc.Container([
 
             # Region Selector
             html.Div([
-                html.P("Toggle Colorblind Mode", style={"marginBottom":0}),
-                daq.BooleanSwitch(id='color_switch', on=False),
-                html.P("Select a Metric", style={"marginBottom": 0}),
+                html.P("Select a Metric", style={"marginBottom": 0, "font-size": "25px"}),
                 # Metric Selector
                 dcc.Dropdown(
                     id="Democracy metric",
@@ -225,7 +188,7 @@ app.layout = dbc.Container([
                     clearable=False,
                     multi=False,
                 ),
-                html.P("Select a Region", style={"marginBottom": 0}),
+                html.P("Select a Region", style={"marginBottom": 0, "font-size": "25px"}),
                 dcc.Dropdown(
                     id="regions",
                     options=["World", "Europe", "Asia", "Africa",
@@ -233,6 +196,8 @@ app.layout = dbc.Container([
                     value="World",
                     clearable=False
                 ),
+                html.P("Toggle Colorblind Mode", style={"marginBottom":0}),
+                daq.BooleanSwitch(id='color_switch', on=False),
             ], style=absolute_object_style)
 
         ], width=9, style=container_style),
@@ -373,7 +338,7 @@ def update_select_country(selected_metric, selected_country):
         yaxis_title="",
         margin=dict(l=0, r=0, t=30, b=10),
         xaxis=dict(tickmode='linear'),
-        title=f"{selected_metric}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}<br><sup>Click the dot to find out what happened in {country_name}</sup>"
+        title=f"Development in {selected_metric}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}<br><sup>Click the dot to find out what happened in {country_name}</sup>"
     ),
 
     fig_selected_country.update_yaxes(
@@ -466,7 +431,7 @@ def update_radar_chart(selected_countries, selected_year):
             )),
           showlegend=True,
           legend_orientation='h',
-          margin=dict(l=0, r=0, t=10, b=15) # sizes the plot
+          margin=dict(l=0, r=0, t=15, b=15) # sizes the plot
         )
 
     return fig
