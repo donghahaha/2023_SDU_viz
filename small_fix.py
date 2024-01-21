@@ -157,6 +157,11 @@ asia_df["e_regiongeo"] = "Asia"
 amer_df = df[df["e_regiongeo"].isin(range(16, 20))].copy()
 amer_df["e_regiongeo"] = "Americas"
 
+n_amer_df = df[df["e_regiongeo"].isin([16, 17, 19])].copy()
+n_amer_df["e_regiongeo"] = "North America"
+
+s_amer_df = df[df["e_regiongeo"].isin([18])].copy()
+s_amer_df["e_regiongeo"] = "South America"
 
 
 #%% Dash App
@@ -230,10 +235,10 @@ app.layout = dbc.Container([
                 ),  # Multi allows for multiple selections.
                 dbc.Tabs([
                     dbc.Tab(
-                       dcc.Graph(id="compare_graph", style={"height": "22vh", "margin":"0", "padding":"0"}), 
+                       dcc.Graph(id="compare_graph", style={"height": "20vh", "margin":"0", "padding":"0"}), 
                     label = "Line (Multiple Years)"),
                     dbc.Tab([
-                       dcc.Graph(id="radar-chart", style={"height": "22vh", "margin":"-10", "padding":"0"}),
+                       dcc.Graph(id="radar-chart", style={"height": "20vh", "margin":"-10", "padding":"0"}),
                        dcc.Dropdown(
                            id="select_year_radar",
                            options=[{"label": x, "value": x}
@@ -253,10 +258,10 @@ app.layout = dbc.Container([
             dbc.Tabs([
                 dbc.Tab(
                    dcc.Graph(id="global_trend_1", style={"height": "22vh"}), 
-                label = "Line (Global Trend)"),
+                label = "Line (World Trends)"),
                 dbc.Tab(
                    dcc.Graph(id="global_trend_2", style={"height": "22vh"}),
-                label = "Area (Continents Trend)")
+                label = "Area (Regions Trends)")
             ]),
             
             width=4, style={"height": "100%"}),
@@ -341,7 +346,7 @@ def update_select_country(selected_metric, selected_country):
         xaxis_title="",
         yaxis_title="",
         margin=dict(l=0, r=0, t=30, b=10),
-        xaxis=dict(tickmode='linear'),
+        #xaxis=dict(tickmode='linear'),
         title=f"Development in {selected_metric}: {df.loc[df['country_text_id'] == country_iso, 'country_name'].iloc[0]}<br><sup>Click the dot to find out what happened in {country_name}</sup>"
     ),
 
@@ -516,14 +521,18 @@ def update_choropleth(selected_metric, selected_region, clicked, switch, old_fig
 
     if selected_region == "World":
         first_layer_fig_choropleth.update_geos(lataxis_range=[-59, 100])  # REMOVES ANTARCTICA!
-
+    
+    if switch:
+        colorscale = [[0, 'purple'], [0.5, "black"], [1, 'green']]
+    else:
+        colorscale = [[0, 'red'], [0.5, "black"], [1, 'blue']]
     second_layer_fig_markers = go.Figure(
         go.Scattergeo(
             locations=df_for_dots["country_text_id"],
             locationmode="ISO-3",
             marker=dict(
                 color=df_for_dots[f"trend_{selected_column}"],
-                colorscale=[[0, 'red'], [0.5, "black"], [1, 'blue']],
+                colorscale=colorscale,
                 size = np.minimum(abs(df_for_dots[f"trend_{selected_column}"]) * 40, 10),
                 symbol=df_for_dots[f"trend_{selected_column}"].apply(
                     lambda x: "triangle-up" if x > 0 else "triangle-down"),
@@ -583,11 +592,68 @@ def update_choropleth(selected_metric, selected_region, clicked, switch, old_fig
     Output('min_max_graph', 'figure'),
     Input("select_year", "value"),
     Input("Democracy metric", "value"),
-    State("min_max_graph", "figure")
+    State("min_max_graph", "figure"),
+    Input("regions", "value"),
+    Input("choropleth", "selectedData")
 )
-def update_min_max_graph(year, selected_metric, old_fig):
+def update_min_max_graph(year, selected_metric, old_fig, region, box_select):
     column = metrics_dict[selected_metric]
-    shortened_df = df[["year", "country_name", column]]
+    
+    if ctx.triggered_id == "choropleth":
+        country_list = []
+        for points in box_select["points"]:
+            if "hovertext" in points:
+                country_list.append(points["hovertext"])
+        
+        shortened_df = df[df["country_name"].isin(country_list)]
+        shortened_df = shortened_df[["year", "country_name", column]]
+        
+        selected_df = shortened_df.loc[df["year"] ==
+                                       year].sort_values(by=column, ascending=True)
+        
+        number = int(min(5, np.floor(len(selected_df) / 2)))
+        
+        min_max_df = pd.concat(
+            [selected_df.head(number), selected_df.tail(number)], ignore_index=True, axis=0)
+
+        fig_combined = px.bar(
+            min_max_df,
+            x=column,
+            y='country_name',
+            title=f"Best and Worst in {selected_metric}",
+            color=column,
+            color_continuous_scale='RdBu'
+        )
+
+        fig_combined.update_layout(
+            xaxis_title=f"{selected_metric}",
+            yaxis_title="State",
+            coloraxis_showscale=False,
+            template='plotly_white',
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
+
+        fig_combined.update_traces(
+            hovertemplate="%{x}"
+        )
+            
+        return fig_combined
+    
+    
+    if region == "World":
+        shortened_df = df[["year", "country_name", column]]
+        
+    elif region == "Asia":
+        shortened_df = asia_df[["year", "country_name", column]]
+    
+    elif region == "Europe":
+        shortened_df = eu_df[["year", "country_name", column]]
+    elif region == "Africa":
+        shortened_df = afr_df[["year", "country_name", column]]
+    elif region == "North America":
+        shortened_df = n_amer_df[["year", "country_name", column]]
+    else: 
+        shortened_df = s_amer_df[["year", "country_name", column]]
     selected_df = shortened_df.loc[df["year"] ==
                                    year].sort_values(by=column, ascending=True)
     min_max_df = pd.concat(
@@ -625,7 +691,7 @@ def update_min_max_graph(year, selected_metric, old_fig):
 def update_area_chart(selected_metric, clicked):
 
     if not clicked:
-        clicked = "MMR"
+        clicked = "TUR"
     else:
         clicked = clicked["points"][0]["location"]
 
@@ -650,7 +716,7 @@ def update_area_chart(selected_metric, clicked):
         hovermode='x unified',
         margin=dict(l=0, r=0, t=30, b=0),
         legend_orientation='h',
-        title=f"{selected_metric}: {df.loc[df['country_text_id'] == clicked, 'country_name'].iloc[0]}"
+        title=f"All Metrics: {df.loc[df['country_text_id'] == clicked, 'country_name'].iloc[0]}"
     )
 
     return plot
@@ -659,14 +725,52 @@ def update_area_chart(selected_metric, clicked):
 @app.callback(
     Output('global_trend_1', 'figure'),
     Input("Democracy metric", "value"),
+    Input("regions", "value"),
+    Input("choropleth", "selectedData")
 )
 
-def update_global_trends_line(selected_metric):
+def update_global_trends_line(selected_metric, region, box_select):
+    
+    if ctx.triggered_id == "choropleth":
+        country_list = []
+        for points in box_select["points"]:
+            if "hovertext" in points:
+                country_list.append(points["hovertext"])
+        column = metrics_dict[selected_metric]
+        df_data = df[df["country_name"].isin(country_list)]
+        df_sum = df_data.groupby('year')[column].mean().reset_index()
+        global_fig = px.line(df_sum, x='year', y=column, title=f'Selected Countries Trends in {selected_metric}')
+        global_fig.update_layout(
+            xaxis_title="",
+            yaxis_title=f"{selected_metric}",
+            coloraxis_showscale=False,
+            template='plotly_white',
+            hovermode='x unified',
+            margin=dict(l=0, r=0, t=30, b=0),
+        )
+        return global_fig
+    
     column = metrics_dict[selected_metric]
-    df_sum = df.groupby('year')[column].mean().reset_index()
-
+    if region == "World":
+        df_sum = df.groupby('year')[column].mean().reset_index()
+    elif region == "Asia":
+        df_sum = asia_df.groupby('year')[column].mean().reset_index()
+        
+    elif region == "North America":
+        df_sum = n_amer_df.groupby('year')[column].mean().reset_index()
+        
+    elif region == "South America":
+        df_sum = s_amer_df.groupby('year')[column].mean().reset_index()
+    
+    elif region == "Africa":
+        df_sum = afr_df.groupby('year')[column].mean().reset_index()
+    else:
+        df_sum = eu_df.groupby('year')[column].mean().reset_index()
+    
+    
+    
     # Plot using px.line
-    global_fig = px.line(df_sum, x='year', y=column, title=f'Global Trends in {selected_metric}')
+    global_fig = px.line(df_sum, x='year', y=column, title=f'{region} Trends in {selected_metric}')
     global_fig.update_layout(
         xaxis_title="",
         yaxis_title=f"{selected_metric}",
@@ -690,8 +794,11 @@ def update_global_trends_area(selected_metric):
     eu_mean = eu_df.groupby("year")[column].mean().reset_index()
     afr_mean = afr_df.groupby("year")[column].mean().reset_index()
     asia_mean = asia_df.groupby("year")[column].mean().reset_index()
-    amer_mean = amer_df.groupby("year")[column].mean().reset_index()
-        
+    n_amer_mean = n_amer_df.groupby("year")[column].mean().reset_index()
+    s_amer_mean = s_amer_df.groupby("year")[column].mean().reset_index()  
+    
+    
+    
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -716,11 +823,19 @@ def update_global_trends_area(selected_metric):
         name="Asia"
     ))
     fig.add_trace(go.Scatter(
-        x=amer_mean["year"], y=amer_mean[column],
+        x=n_amer_mean["year"], y=n_amer_mean[column],
         hoverinfo='x+y',
         mode='lines',
         stackgroup='one',
-        name="Americas"
+        name="North America"
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=s_amer_mean["year"], y=s_amer_mean[column],
+        hoverinfo='x+y',
+        mode='lines',
+        stackgroup='one',
+        name="South America"
     ))
     
     fig.update_layout(
